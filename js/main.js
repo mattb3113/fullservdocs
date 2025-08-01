@@ -70,12 +70,6 @@ class BuellDocsApp {
     }
 
     initializeComponents() {
-        // Initialize any components that need setup
-        this.initializeAnimations();
-        this.initializeTooltips();
-    }
-
-    initializeAnimations() {
         // Add scroll animations
         const observerOptions = {
             threshold: 0.1,
@@ -91,7 +85,6 @@ class BuellDocsApp {
             });
         }, observerOptions);
 
-        // Observe service cards
         document.querySelectorAll('.service-card').forEach(card => {
             card.style.opacity = '0';
             card.style.transform = 'translateY(20px)';
@@ -100,18 +93,10 @@ class BuellDocsApp {
         });
     }
 
-    initializeTooltips() {
-        // Initialize tooltips for elements with data-tooltip attribute
-        document.querySelectorAll('[data-tooltip]').forEach(element => {
-            element.classList.add('tooltip');
-        });
-    }
-
     showModal(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.style.display = 'block';
-            // Add animation class
             setTimeout(() => {
                 modal.querySelector('.modal-content').style.transform = 'scale(1)';
                 modal.querySelector('.modal-content').style.opacity = '1';
@@ -127,7 +112,6 @@ class BuellDocsApp {
             content.style.opacity = '0';
             setTimeout(() => {
                 modal.style.display = 'none';
-                // Reset form if it exists
                 const form = modal.querySelector('form');
                 if (form) form.reset();
             }, 300);
@@ -140,17 +124,14 @@ class BuellDocsApp {
         const email = formData.get('email');
         const password = formData.get('password');
 
-        // Show loading state
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
         submitBtn.textContent = 'Logging in...';
         submitBtn.disabled = true;
 
         try {
-            // Simulate API call
             await this.simulateApiCall(1000);
             
-            // For demo purposes, accept any email/password
             const user = {
                 id: 1,
                 name: 'Ferris Bueller',
@@ -187,14 +168,12 @@ class BuellDocsApp {
             return;
         }
 
-        // Show loading state
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
         submitBtn.textContent = 'Creating Account...';
         submitBtn.disabled = true;
 
         try {
-            // Simulate API call
             await this.simulateApiCall(1500);
             
             const user = {
@@ -221,19 +200,12 @@ class BuellDocsApp {
     }
 
     showDashboard() {
-        // Hide main content
-        document.querySelector('.main-nav').style.display = 'none';
-        document.querySelector('.hero').style.display = 'none';
-        document.querySelector('.services').style.display = 'none';
+        document.querySelector('.main-nav').classList.add('hidden');
+        document.querySelector('.hero').classList.add('hidden');
+        document.querySelector('.services').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
 
-        // Show dashboard
-        const dashboard = document.getElementById('dashboard');
-        dashboard.classList.remove('hidden');
-
-        // Update user info in sidebar
         this.updateUserInfo();
-
-        // Initialize dashboard
         if (window.dashboardManager) {
             window.dashboardManager.init();
         }
@@ -256,30 +228,23 @@ class BuellDocsApp {
         this.isAuthenticated = false;
         localStorage.removeItem('buelldocs_user');
 
-        // Show main content
-        document.querySelector('.main-nav').style.display = 'block';
-        document.querySelector('.hero').style.display = 'flex';
-        document.querySelector('.services').style.display = 'block';
-
-        // Hide dashboard
+        document.querySelector('.main-nav').classList.remove('hidden');
+        document.querySelector('.hero').classList.remove('hidden');
+        document.querySelector('.services').classList.remove('hidden');
         document.getElementById('dashboard').classList.add('hidden');
 
         this.showMessage('You have been logged out successfully.', 'info');
     }
 
     showMessage(text, type = 'info') {
-        // Create message element
         const message = document.createElement('div');
         message.className = `message ${type}`;
         message.innerHTML = `
             <span class="message-icon">${this.getMessageIcon(type)}</span>
             <span class="message-text">${text}</span>
         `;
-
-        // Add to page
         document.body.appendChild(message);
 
-        // Position message
         message.style.position = 'fixed';
         message.style.top = '20px';
         message.style.right = '20px';
@@ -288,12 +253,10 @@ class BuellDocsApp {
         message.style.transform = 'translateX(100%)';
         message.style.transition = 'transform 0.3s ease';
 
-        // Animate in
         setTimeout(() => {
             message.style.transform = 'translateX(0)';
         }, 10);
 
-        // Remove after delay
         setTimeout(() => {
             message.style.transform = 'translateX(100%)';
             setTimeout(() => {
@@ -321,12 +284,9 @@ class BuellDocsApp {
     }
 }
 
-// Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.buellDocsApp = new BuellDocsApp();
 });
-
-// Add some CSS for modal animations
 const style = document.createElement('style');
 style.textContent = `
     .modal-content {
@@ -337,6 +297,9 @@ style.textContent = `
     
     .message {
         box-shadow: var(--shadow-lg);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
     }
     
     .message-icon {
@@ -345,6 +308,10 @@ style.textContent = `
     
     .message-text {
         flex: 1;
+    }
+
+    .hidden {
+        display: none !important;
     }
 `;
 document.head.appendChild(style);
