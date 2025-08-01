@@ -257,11 +257,11 @@ function App() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { name: 'Paystubs', desc: 'Professional payroll statements with accurate calculations', icon: '📊', available: true },
-              { name: 'W-2 Forms', desc: 'Complete tax forms with all required information', icon: '📋', available: true },
+              { name: 'Paystubs', desc: 'Professional payroll statements with accurate calculations', icon: '💸', available: true },
+              { name: 'W-2 Forms', desc: 'Complete tax forms with all required information', icon: '📄', available: true },
               { name: 'Employment Letters', desc: 'Official employment verification documents', icon: '📝', available: false },
               { name: 'Bank Statements', desc: 'Detailed financial statements with transaction history', icon: '🏦', available: false },
-              { name: 'Utility Bills', desc: 'Professional utility and service bills', icon: '⚡', available: false },
+              { name: 'Utility Bills', desc: 'Professional utility and service bills', icon: '💡', available: false },
               { name: 'Insurance Documents', desc: 'Coverage verification and policy documents', icon: '🛡️', available: false }
             ].map((doc, index) => (
               <div key={index} className={`bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${!doc.available ? 'opacity-60' : ''}`}>
