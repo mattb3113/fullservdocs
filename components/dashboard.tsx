@@ -126,11 +126,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   const getDocumentIcon = (type: string) => {
     switch (type) {
       case 'paystub':
-        return '📊';
+        return '💸';
       case 'w2':
-        return '📋';
-      default:
         return '📄';
+      default:
+        return '📁';
     }
   };
 
@@ -259,7 +259,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     Welcome back, {user.name}!
                   </h1>
                   <p className="text-gray-600">
-                    Member since {memberSince} • Ready to create your next document?
+                    Member since {memberSince} — Ready to create your next document?
                   </p>
                 </div>
 
@@ -310,7 +310,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       onClick={onNavigateToPaystub}
                       className="flex items-center space-x-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
                     >
-                      <div className="text-2xl">📊</div>
+                      <div className="text-2xl">💸</div>
                       <div className="text-left">
                         <h3 className="font-semibold text-gray-900">Generate Paystub</h3>
                         <p className="text-sm text-gray-600">Create professional payroll statements</p>
@@ -321,7 +321,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       onClick={onNavigateToW2}
                       className="flex items-center space-x-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
                     >
-                      <div className="text-2xl">📋</div>
+                      <div className="text-2xl">📄</div>
                       <div className="text-left">
                         <h3 className="font-semibold text-gray-900">Generate W-2 Form</h3>
                         <p className="text-sm text-gray-600">Create complete tax forms</p>
@@ -408,7 +408,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <div>
                               <h3 className="font-medium text-gray-900">{doc.name}</h3>
                               <p className="text-sm text-gray-600">
-                                {getDocumentTypeName(doc.type)} • {formatDate(doc.createdAt)}
+                                {getDocumentTypeName(doc.type)} — {formatDate(doc.createdAt)}
                               </p>
                             </div>
                           </div>
