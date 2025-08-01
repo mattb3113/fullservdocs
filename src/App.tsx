@@ -77,6 +77,15 @@ function App() {
     setShowAuthModal(true);
   };
 
+  // Function to handle "Start Creating Documents" button click on landing page
+  const handleStartCreatingDocuments = () => {
+    if (isAuthenticated) {
+      setCurrentView('generator'); // If authenticated, go directly to generator
+    } else {
+      openAuthModal('register'); // Otherwise, open register modal
+    }
+  };
+
   if (currentView === 'dashboard' && isAuthenticated) {
     return (
       <Dashboard 
@@ -144,7 +153,7 @@ function App() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => openAuthModal('register')}
+              onClick={handleStartCreatingDocuments} // Updated to use new handler
               className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
             >
               <FileText className="h-5 w-5" />
