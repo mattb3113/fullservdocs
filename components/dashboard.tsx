@@ -1,65 +1,154 @@
-import React, { useState } from 'react';
-import { FileText, Plus, History, Settings, LogOut, User, CreditCard, Download, Eye } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  FileText, 
+  User, 
+  Settings, 
+  LogOut, 
+  Plus, 
+  Download, 
+  Eye, 
+  Copy,
+  Calendar,
+  TrendingUp,
+  Clock,
+  AlertCircle
+} from 'lucide-react';
 
 interface User {
   id: string;
   name: string;
   email: string;
   avatar: string;
-}
-
-interface DashboardProps {
-  user: User;
-  onLogout: () => void;
-  onNavigateToGenerator: () => void;
+  joinDate: string;
 }
 
 interface Document {
   id: string;
-  type: string;
+  type: 'paystub' | 'w2';
   name: string;
   createdAt: string;
   status: 'completed' | 'processing';
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onNavigateToGenerator }) => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [documents] = useState<Document[]>([
-    {
-      id: '1',
-      type: 'paystub',
-      name: 'Paystub - John Doe - March 2025',
-      createdAt: '2025-01-15T10:30:00Z',
-      status: 'completed'
-    },
-    {
-      id: '2',
-      type: 'w2',
-      name: 'W-2 Form - John Doe - 2024',
-      createdAt: '2025-01-14T15:45:00Z',
-      status: 'completed'
-    }
-  ]);
+interface DashboardStats {
+  totalDocuments: number;
+  thisMonth: number;
+  lastGenerated: string;
+}
 
-  const getDocumentIcon = (type: string) => {
-    const icons: { [key: string]: string } = {
-      paystub: '📊',
-      w2: '📋',
-      employment: '📝',
-      bank: '🏦',
-      utility: '⚡',
-      insurance: '🛡️'
-    };
-    return icons[type] || '📄';
+interface DashboardProps {
+  user: User;
+  onLogout: () => void;
+  onNavigateToPaystub: () => void;
+  onNavigateToW2: () => void;
+  onNavigateToDashboard: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ 
+  user, 
+  onLogout, 
+  onNavigateToPaystub, 
+  onNavigateToW2,
+  onNavigateToDashboard 
+}) => {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalDocuments: 0,
+    thisMonth: 0,
+    lastGenerated: 'Never'
+  });
+  const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'templates' | 'settings'>('overview');
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = () => {
+    // Load documents from localStorage
+    const savedDocuments = localStorage.getItem('buelldocs_documents');
+    const userDocuments = savedDocuments ? JSON.parse(savedDocuments) : [];
+    setDocuments(userDocuments);
+
+    // Calculate stats
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const thisMonthDocs = userDocuments.filter((doc: Document) => {
+      const docDate = new Date(doc.createdAt);
+      return docDate.getMonth() === currentMonth && docDate.getFullYear() === currentYear;
+    });
+
+    const lastDoc = userDocuments.length > 0 ? userDocuments[0] : null;
+    const lastGenerated = lastDoc 
+      ? new Date(lastDoc.createdAt).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })
+      : 'Never';
+
+    setStats({
+      totalDocuments: userDocuments.length,
+      thisMonth: thisMonthDocs.length,
+      lastGenerated
+    });
+  };
+
+  const handleDocumentAction = (action: string, docId: string) => {
+    const doc = documents.find(d => d.id === docId);
+    if (!doc) return;
+
+    switch (action) {
+      case 'download':
+        // Simulate download
+        alert(`Downloading ${doc.name}...`);
+        break;
+      case 'view':
+        // Simulate view
+        alert(`Opening ${doc.name} for preview...`);
+        break;
+      case 'duplicate':
+        // Simulate duplicate
+        alert(`Creating a copy of ${doc.name}...`);
+        break;
+    }
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
       year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
+
+  const getDocumentIcon = (type: string) => {
+    switch (type) {
+      case 'paystub':
+        return '📊';
+      case 'w2':
+        return '📋';
+      default:
+        return '📄';
+    }
+  };
+
+  const getDocumentTypeName = (type: string) => {
+    switch (type) {
+      case 'paystub':
+        return 'Paystub';
+      case 'w2':
+        return 'W-2 Form';
+      default:
+        return 'Document';
+    }
+  };
+
+  const memberSince = new Date(user.joinDate).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric'
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,19 +163,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onNavigateToGener
             
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                   {user.avatar}
                 </div>
-                <div>
+                <div className="hidden md:block">
                   <p className="text-sm font-medium text-gray-900">{user.name}</p>
                   <p className="text-xs text-gray-500">{user.email}</p>
                 </div>
               </div>
               <button
                 onClick={onLogout}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
               >
-                <LogOut className="h-5 w-5" />
+                <LogOut className="h-4 w-4" />
+                <span className="hidden md:inline">Sign Out</span>
               </button>
             </div>
           </div>
@@ -97,71 +187,62 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onNavigateToGener
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar */}
           <div className="lg:w-64">
-            <nav className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <nav className="bg-white rounded-lg shadow-sm p-4">
               <ul className="space-y-2">
                 <li>
                   <button
                     onClick={() => setActiveTab('overview')}
                     className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
                       activeTab === 'overview' 
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                        : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <User className="h-5 w-5" />
+                    <TrendingUp className="h-5 w-5" />
                     <span>Overview</span>
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => setActiveTab('generate')}
+                    onClick={() => setActiveTab('documents')}
                     className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                      activeTab === 'generate' 
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                        : 'text-gray-600 hover:bg-gray-50'
+                      activeTab === 'documents' 
+                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                        : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <Plus className="h-5 w-5" />
-                    <span>Generate Documents</span>
+                    <FileText className="h-5 w-5" />
+                    <span>My Documents</span>
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => setActiveTab('history')}
-                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                      activeTab === 'history' 
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                        : 'text-gray-600 hover:bg-gray-50'
+                    onClick={() => setActiveTab('templates')}
+                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors opacity-60 cursor-not-allowed ${
+                      activeTab === 'templates' 
+                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                        : 'text-gray-700'
                     }`}
+                    disabled
                   >
-                    <History className="h-5 w-5" />
-                    <span>Document History</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActiveTab('billing')}
-                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                      activeTab === 'billing' 
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <CreditCard className="h-5 w-5" />
-                    <span>Billing</span>
+                    <Copy className="h-5 w-5" />
+                    <span>Templates</span>
+                    <span className="text-xs text-gray-400 ml-auto">Soon</span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => setActiveTab('settings')}
-                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors opacity-60 cursor-not-allowed ${
                       activeTab === 'settings' 
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                        : 'text-gray-700'
                     }`}
+                    disabled
                   >
                     <Settings className="h-5 w-5" />
                     <span>Settings</span>
+                    <span className="text-xs text-gray-400 ml-auto">Soon</span>
                   </button>
                 </li>
               </ul>
@@ -172,228 +253,216 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onNavigateToGener
           <div className="flex-1">
             {activeTab === 'overview' && (
               <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user.name}!</h1>
-                  <p className="text-gray-600">Manage your documents and account settings</p>
+                {/* Welcome Section */}
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                    Welcome back, {user.name}!
+                  </h1>
+                  <p className="text-gray-600">
+                    Member since {memberSince} • Ready to create your next document?
+                  </p>
                 </div>
 
-                {/* Stats */}
+                {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-600">Total Documents</p>
-                        <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
+                        <p className="text-3xl font-bold text-gray-900">{stats.totalDocuments}</p>
                       </div>
-                      <FileText className="h-8 w-8 text-blue-600" />
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+
+                  <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-600">This Month</p>
-                        <p className="text-2xl font-bold text-gray-900">2</p>
+                        <p className="text-3xl font-bold text-gray-900">{stats.thisMonth}</p>
                       </div>
-                      <Plus className="h-8 w-8 text-green-600" />
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <Calendar className="h-6 w-6 text-green-600" />
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+
+                  <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Credits Remaining</p>
-                        <p className="text-2xl font-bold text-gray-900">3</p>
+                        <p className="text-sm font-medium text-gray-600">Last Generated</p>
+                        <p className="text-lg font-bold text-gray-900">{stats.lastGenerated}</p>
                       </div>
-                      <CreditCard className="h-8 w-8 text-purple-600" />
+                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Clock className="h-6 w-6 text-purple-600" />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Recent Documents */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="p-6 border-b border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-900">Recent Documents</h2>
-                  </div>
-                  <div className="p-6">
-                    {documents.length > 0 ? (
-                      <div className="space-y-4">
-                        {documents.slice(0, 3).map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-2xl">{getDocumentIcon(doc.type)}</span>
-                              <div>
-                                <p className="font-medium text-gray-900">{doc.name}</p>
-                                <p className="text-sm text-gray-500">Created {formatDate(doc.createdAt)}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button className="p-2 text-gray-400 hover:text-green-600 transition-colors">
-                                <Download className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                {/* Quick Actions */}
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={onNavigateToPaystub}
+                      className="flex items-center space-x-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="text-2xl">📊</div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-gray-900">Generate Paystub</h3>
+                        <p className="text-sm text-gray-600">Create professional payroll statements</p>
                       </div>
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No documents yet. Create your first document!</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+                    </button>
 
-            {activeTab === 'generate' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Generate Documents</h1>
-                  <p className="text-gray-600">Choose a document type to get started</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[
-                    { type: 'paystub', name: 'Paystub', desc: 'Professional payroll statements', icon: '📊', popular: true },
-                    { type: 'w2', name: 'W-2 Form', desc: 'Annual tax forms', icon: '📋', popular: true },
-                    { type: 'employment', name: 'Employment Letter', desc: 'Verification letters', icon: '📝', popular: false },
-                    { type: 'bank', name: 'Bank Statement', desc: 'Financial statements', icon: '🏦', popular: false },
-                    { type: 'utility', name: 'Utility Bill', desc: 'Service bills', icon: '⚡', popular: false },
-                    { type: 'insurance', name: 'Insurance Document', desc: 'Coverage verification', icon: '🛡️', popular: false }
-                  ].map((docType) => (
-                    <div key={docType.type} className="relative bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                      {docType.popular && (
-                        <div className="absolute -top-2 -right-2">
-                          <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">Popular</span>
-                        </div>
-                      )}
-                      <div className="text-3xl mb-3">{docType.icon}</div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{docType.name}</h3>
-                      <p className="text-gray-600 text-sm mb-4">{docType.desc}</p>
-                      <button
-                        onClick={onNavigateToGenerator}
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Create {docType.name}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'history' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Document History</h1>
-                  <p className="text-gray-600">View and manage your generated documents</p>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="p-6">
-                    {documents.length > 0 ? (
-                      <div className="space-y-4">
-                        {documents.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-2xl">{getDocumentIcon(doc.type)}</span>
-                              <div>
-                                <p className="font-medium text-gray-900">{doc.name}</p>
-                                <p className="text-sm text-gray-500">Created {formatDate(doc.createdAt)}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                doc.status === 'completed' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {doc.status}
-                              </span>
-                              <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button className="p-2 text-gray-400 hover:text-green-600 transition-colors">
-                                <Download className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                    <button
+                      onClick={onNavigateToW2}
+                      className="flex items-center space-x-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="text-2xl">📋</div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-gray-900">Generate W-2 Form</h3>
+                        <p className="text-sm text-gray-600">Create complete tax forms</p>
                       </div>
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">No documents yet. Create your first document!</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'billing' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Billing & Credits</h1>
-                  <p className="text-gray-600">Manage your account credits and billing information</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Current Credits</h3>
-                    <div className="text-3xl font-bold text-blue-600 mb-2">3</div>
-                    <p className="text-gray-600 mb-4">Document generations remaining</p>
-                    <button className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                      Purchase More Credits
                     </button>
                   </div>
+                </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing History</h3>
+                {/* Recent Activity */}
+                {documents.length > 0 && (
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
                     <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Document Bundle</span>
-                        <span className="font-semibold">$24.99</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm text-gray-500">
-                        <span>Jan 15, 2025</span>
-                        <span>Completed</span>
-                      </div>
+                      {documents.slice(0, 3).map((doc) => (
+                        <div key={doc.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="text-xl">{getDocumentIcon(doc.type)}</div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{doc.name}</p>
+                            <p className="text-sm text-gray-600">{formatDate(doc.createdAt)}</p>
+                          </div>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                            {doc.status}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'documents' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h1 className="text-2xl font-bold text-gray-900">My Documents</h1>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={onNavigateToPaystub}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>New Paystub</span>
+                    </button>
+                    <button
+                      onClick={onNavigateToW2}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>New W-2</span>
+                    </button>
+                  </div>
                 </div>
+
+                {documents.length === 0 ? (
+                  <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No documents yet</h3>
+                    <p className="text-gray-600 mb-6">Get started by creating your first document</p>
+                    <div className="flex justify-center space-x-4">
+                      <button
+                        onClick={onNavigateToPaystub}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Create Paystub
+                      </button>
+                      <button
+                        onClick={onNavigateToW2}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Create W-2
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow-sm">
+                    <div className="p-6 border-b border-gray-200">
+                      <h2 className="text-lg font-semibold text-gray-900">Document History</h2>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {documents.map((doc) => (
+                        <div key={doc.id} className="p-6 flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="text-2xl">{getDocumentIcon(doc.type)}</div>
+                            <div>
+                              <h3 className="font-medium text-gray-900">{doc.name}</h3>
+                              <p className="text-sm text-gray-600">
+                                {getDocumentTypeName(doc.type)} • {formatDate(doc.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                              {doc.status}
+                            </span>
+                            <button
+                              onClick={() => handleDocumentAction('view', doc.id)}
+                              className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="View"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDocumentAction('download', doc.id)}
+                              className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                              title="Download"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDocumentAction('duplicate', doc.id)}
+                              className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
+                              title="Duplicate"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'templates' && (
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Templates Coming Soon</h3>
+                <p className="text-gray-600">
+                  Save and reuse your document templates for faster generation.
+                </p>
               </div>
             )}
 
             {activeTab === 'settings' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-                  <p className="text-gray-600">Manage your account preferences</p>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                      <input
-                        type="text"
-                        defaultValue={user.name}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        defaultValue={user.email}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <button className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Settings Coming Soon</h3>
+                <p className="text-gray-600">
+                  Manage your account preferences and document settings.
+                </p>
               </div>
             )}
           </div>
