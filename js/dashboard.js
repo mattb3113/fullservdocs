@@ -5,6 +5,7 @@ class DashboardManager {
         this.currentStep = 1;
         this.currentDocumentType = null;
         this.formData = {};
+        this.documentGenerator = new DocumentGenerator();
     }
 
     init() {
@@ -13,7 +14,6 @@ class DashboardManager {
     }
 
     bindEvents() {
-        // Sidebar navigation
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -22,14 +22,12 @@ class DashboardManager {
             });
         });
 
-        // Logout button
         document.getElementById('logoutBtn')?.addEventListener('click', () => {
             if (window.buellDocsApp) {
                 window.buellDocsApp.logout();
             }
         });
 
-        // Document type buttons
         document.querySelectorAll('.doc-type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const docType = btn.dataset.type;
@@ -37,50 +35,40 @@ class DashboardManager {
             });
         });
 
-        // Form navigation
         document.getElementById('nextStep')?.addEventListener('click', () => this.nextStep());
         document.getElementById('prevStep')?.addEventListener('click', () => this.prevStep());
         document.getElementById('backToDocuments')?.addEventListener('click', () => this.showSection('documents'));
 
-        // Form submission
         document.getElementById('docGenerationForm')?.addEventListener('submit', (e) => this.handleFormSubmission(e));
 
-        // History actions
         document.querySelectorAll('.btn-icon').forEach(btn => {
             btn.addEventListener('click', (e) => this.handleHistoryAction(e));
         });
 
-        // Template actions
         document.querySelectorAll('.template-card .btn-primary').forEach(btn => {
             btn.addEventListener('click', (e) => this.handleTemplateAction(e));
         });
 
-        // Settings forms
         document.querySelectorAll('.settings-form').forEach(form => {
             form.addEventListener('submit', (e) => this.handleSettingsUpdate(e));
         });
 
-        // Filter changes
         document.getElementById('typeFilter')?.addEventListener('change', () => this.filterHistory());
         document.getElementById('dateFilter')?.addEventListener('change', () => this.filterHistory());
     }
 
     showSection(sectionName) {
-        // Update navigation
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
         document.querySelector(`[data-section="${sectionName}"]`)?.classList.add('active');
 
-        // Update content
         document.querySelectorAll('.dashboard-section').forEach(section => {
             section.classList.remove('active');
         });
         document.getElementById(sectionName)?.classList.add('active');
 
         this.currentSection = sectionName;
-
-        // Load section-specific data
         this.loadSectionData(sectionName);
     }
 
@@ -99,7 +87,6 @@ class DashboardManager {
     }
 
     loadOverviewData() {
-        // Simulate loading recent activity
         this.animateStats();
     }
 
@@ -131,7 +118,6 @@ class DashboardManager {
         this.currentStep = 1;
         this.formData = {};
 
-        // Update form title and description
         const titles = {
             'paystub': 'Generate Paystub',
             'w2': 'Generate W-2 Form',
@@ -159,10 +145,8 @@ class DashboardManager {
         document.getElementById('formTitle').textContent = titles[docType] || 'Generate Document';
         document.getElementById('formDescription').textContent = descriptions[docType] || 'Fill in the required information.';
 
-        // Load dynamic fields for document type
         this.loadDynamicFields(docType);
 
-        // Show form section
         this.showSection('documentForm');
         this.updateFormProgress();
     }
@@ -177,7 +161,7 @@ class DashboardManager {
                     <div class="form-row">
                         <div class="form-group">
                             <label for="employer">Employer Name</label>
-                            <input type="text" id="employer" name="employer" required>
+                            <input type="text" id="employer" name="employerName" required>
                         </div>
                         <div class="form-group">
                             <label for="position">Position/Title</label>
@@ -308,7 +292,6 @@ class DashboardManager {
 
     saveCurrentStepData() {
         const currentStepElement = document.querySelector(`.form-step[data-step="${this.currentStep}"]`);
-        const formData = new FormData();
         const inputs = currentStepElement.querySelectorAll('input, select, textarea');
 
         inputs.forEach(input => {
@@ -324,7 +307,6 @@ class DashboardManager {
         });
         document.querySelector(`.progress-step[data-step="${this.currentStep}"]`)?.classList.add('active');
 
-        // Update button visibility
         const prevBtn = document.getElementById('prevStep');
         const nextBtn = document.getElementById('nextStep');
         const generateBtn = document.getElementById('generateDoc');
@@ -341,14 +323,12 @@ class DashboardManager {
         document.querySelector(`.form-step[data-step="${this.currentStep}"]`)?.classList.add('active');
     }
 
-    generatePreview() {
-        // Update review section
+    async generatePreview() {
         document.getElementById('reviewDocType').textContent = this.getDocumentTypeName(this.currentDocumentType);
         document.getElementById('reviewName').textContent = this.formData.fullName || '';
         document.getElementById('reviewAddress').textContent = 
             `${this.formData.address || ''}, ${this.formData.city || ''}, ${this.formData.state || ''} ${this.formData.zipCode || ''}`;
 
-        // Simulate preview generation
         const previewFrame = document.querySelector('.document-preview-frame');
         previewFrame.innerHTML = `
             <div class="preview-loading">
@@ -357,25 +337,20 @@ class DashboardManager {
             </div>
         `;
 
-        setTimeout(() => {
-            previewFrame.innerHTML = `
-                <div class="document-preview-content">
-                    <div class="preview-header">
-                        <h4>${this.getDocumentTypeName(this.currentDocumentType)}</h4>
-                        <p>Preview generated successfully</p>
+        try {
+            const documentData = await this.documentGenerator.generateDocument(this.currentDocumentType, this.formData);
+            if (documentData.success) {
+                previewFrame.innerHTML = `
+                    <div class="document-preview-content">
+                        ${documentData.document.content}
                     </div>
-                    <div class="preview-body">
-                        <p><strong>Name:</strong> ${this.formData.fullName}</p>
-                        <p><strong>Address:</strong> ${this.formData.address}</p>
-                        <p><strong>Document Type:</strong> ${this.getDocumentTypeName(this.currentDocumentType)}</p>
-                        <div class="preview-placeholder">
-                            <p>📄 Document preview would appear here</p>
-                            <p>All information has been validated and formatted correctly.</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }, 2000);
+                `;
+            } else {
+                previewFrame.innerHTML = `<p class="text-muted">Failed to generate preview: ${documentData.error}</p>`;
+            }
+        } catch (error) {
+            previewFrame.innerHTML = `<p class="text-muted">Error generating preview: ${error.message}</p>`;
+        }
     }
 
     getDocumentTypeName(type) {
@@ -402,15 +377,15 @@ class DashboardManager {
         generateBtn.disabled = true;
 
         try {
-            // Simulate document generation
-            await this.simulateDocumentGeneration();
+            const documentData = await this.documentGenerator.generateDocument(this.currentDocumentType, this.formData);
             
-            // Add to history
-            this.addToHistory();
-            
-            window.buellDocsApp?.showMessage('Document generated successfully!', 'success');
-            this.showSection('history');
-            
+            if (documentData.success) {
+                this.addToHistory(documentData.metadata);
+                window.buellDocsApp?.showMessage('Document generated successfully!', 'success');
+                this.showSection('history');
+            } else {
+                window.buellDocsApp?.showMessage('Failed to generate document: ' + documentData.error, 'error');
+            }
         } catch (error) {
             window.buellDocsApp?.showMessage('Failed to generate document. Please try again.', 'error');
         } finally {
@@ -419,43 +394,35 @@ class DashboardManager {
         }
     }
 
-    simulateDocumentGeneration() {
-        return new Promise((resolve) => {
-            setTimeout(resolve, 3000);
-        });
-    }
-
-    addToHistory() {
+    addToHistory(metadata) {
         const historyList = document.querySelector('.history-list');
         const newItem = document.createElement('div');
         newItem.className = 'history-item';
         
-        const docIcon = this.getDocumentIcon(this.currentDocumentType);
-        const docName = this.getDocumentTypeName(this.currentDocumentType);
-        const timestamp = new Date().toLocaleDateString('en-US', { 
+        const docIcon = this.getDocumentIcon(metadata.documentType);
+        const docName = this.getDocumentTypeName(metadata.documentType);
+        const timestamp = new Date(metadata.generatedAt).toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
         });
-        const docId = `${this.currentDocumentType.toUpperCase()}-${Date.now()}`;
 
         newItem.innerHTML = `
             <div class="history-icon">${docIcon}</div>
             <div class="history-details">
                 <span class="history-title">${docName} - ${this.formData.fullName || 'Document'}</span>
                 <span class="history-date">Generated on ${timestamp}</span>
-                <span class="history-id">ID: ${docId}</span>
+                <span class="history-id">ID: ${metadata.documentId}</span>
             </div>
             <div class="history-actions">
-                <button class="btn-icon" title="Download" data-action="download">📥</button>
-                <button class="btn-icon" title="View" data-action="view">👁️</button>
+                <a href="${metadata.downloadUrl}" class="btn-icon" title="Download" data-action="download" download>📥</a>
+                <a href="${metadata.previewUrl}" target="_blank" class="btn-icon" title="View" data-action="view">👁️</a>
                 <button class="btn-icon" title="Duplicate" data-action="duplicate">📋</button>
             </div>
         `;
 
         historyList.insertBefore(newItem, historyList.firstChild);
         
-        // Bind events for new item
         newItem.querySelectorAll('.btn-icon').forEach(btn => {
             btn.addEventListener('click', (e) => this.handleHistoryAction(e));
         });
@@ -516,27 +483,21 @@ class DashboardManager {
         const typeFilter = document.getElementById('typeFilter')?.value;
         const dateFilter = document.getElementById('dateFilter')?.value;
         
-        // In a real app, this would filter the history items
         window.buellDocsApp?.showMessage('Filters applied to history', 'info');
     }
 
     loadHistoryData() {
-        // Simulate loading history data
         console.log('Loading history data...');
     }
 
     loadTemplatesData() {
-        // Simulate loading templates data
         console.log('Loading templates data...');
     }
 }
 
-// Initialize dashboard manager
 document.addEventListener('DOMContentLoaded', () => {
     window.dashboardManager = new DashboardManager();
 });
-
-// Add CSS for preview content
 const style = document.createElement('style');
 style.textContent = `
     .document-preview-content {
