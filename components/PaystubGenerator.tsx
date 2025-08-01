@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Download, CreditCard, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Eye, LogOut } from 'lucide-react';
 
 interface User {
   id: string;
@@ -11,6 +11,7 @@ interface User {
 interface PaystubGeneratorProps {
   user: User;
   onBack: () => void;
+  onLogout: () => void;
 }
 
 interface PaystubData {
@@ -34,33 +35,19 @@ interface PaystubData {
   payPeriodStart: string;
   payPeriodEnd: string;
   payDate: string;
-  payFrequency: string;
-  grossPay: number;
-  hourlyRate: number;
+  payRate: number;
   hoursWorked: number;
   
-  // Deductions
-  federalTax: number;
-  stateTax: number;
-  socialSecurity: number;
-  medicare: number;
-  stateDisability: number;
-  healthInsurance: number;
-  retirement401k: number;
-  
-  // YTD Totals
-  ytdGrossPay: number;
-  ytdFederalTax: number;
-  ytdStateTax: number;
-  ytdSocialSecurity: number;
-  ytdMedicare: number;
+  // Deductions (optional - will be calculated if not provided)
+  federalTax?: number;
+  stateTax?: number;
+  socialSecurity?: number;
+  medicare?: number;
+  stateDisability?: number;
 }
 
-const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack }) => {
+const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack, onLogout }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [paymentComplete, setPaymentComplete] = useState(false);
   const [formData, setFormData] = useState<PaystubData>({
     employeeName: '',
     employeeAddress: '',
@@ -77,87 +64,32 @@ const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack }) => 
     payPeriodStart: '',
     payPeriodEnd: '',
     payDate: '',
-    payFrequency: 'biweekly',
-    grossPay: 0,
-    hourlyRate: 0,
-    hoursWorked: 0,
-    federalTax: 0,
-    stateTax: 0,
-    socialSecurity: 0,
-    medicare: 0,
-    stateDisability: 0,
-    healthInsurance: 0,
-    retirement401k: 0,
-    ytdGrossPay: 0,
-    ytdFederalTax: 0,
-    ytdStateTax: 0,
-    ytdSocialSecurity: 0,
-    ytdMedicare: 0
+    payRate: 0,
+    hoursWorked: 0
   });
+  const [generatedDocument, setGeneratedDocument] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const updateFormData = (field: keyof PaystubData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Auto-calculate taxes when gross pay changes
-    if (field === 'grossPay' && typeof value === 'number') {
-      calculateTaxes(value);
-    }
-    
-    // Calculate gross pay from hourly rate and hours
-    if ((field === 'hourlyRate' || field === 'hoursWorked') && typeof value === 'number') {
-      const rate = field === 'hourlyRate' ? value : formData.hourlyRate;
-      const hours = field === 'hoursWorked' ? value : formData.hoursWorked;
-      const gross = rate * hours;
-      setFormData(prev => ({ ...prev, grossPay: gross }));
-      calculateTaxes(gross);
-    }
-  };
-
-  const calculateTaxes = (grossPay: number) => {
-    // Federal tax calculation (simplified)
-    const federalRate = grossPay <= 1000 ? 0.10 : grossPay <= 2000 ? 0.12 : 0.22;
-    const federalTax = grossPay * federalRate;
-    
-    // State tax (5% average)
-    const stateTax = grossPay * 0.05;
-    
-    // Social Security (6.2%)
-    const socialSecurity = grossPay * 0.062;
-    
-    // Medicare (1.45%)
-    const medicare = grossPay * 0.0145;
-    
-    // State disability (1%)
-    const stateDisability = grossPay * 0.01;
-    
+  const handleInputChange = (field: keyof PaystubData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
-      federalTax: Math.round(federalTax * 100) / 100,
-      stateTax: Math.round(stateTax * 100) / 100,
-      socialSecurity: Math.round(socialSecurity * 100) / 100,
-      medicare: Math.round(medicare * 100) / 100,
-      stateDisability: Math.round(stateDisability * 100) / 100
+      [field]: value
     }));
   };
 
-  const calculateNetPay = () => {
-    const totalDeductions = formData.federalTax + formData.stateTax + formData.socialSecurity + 
-                           formData.medicare + formData.stateDisability + formData.healthInsurance + 
-                           formData.retirement401k;
-    return formData.grossPay - totalDeductions;
-  };
-
-  const validateStep = (step: number) => {
+  const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return formData.employeeName && formData.employeeAddress && formData.employeeCity && 
-               formData.employeeState && formData.employeeZip;
+        return !!(formData.employeeName && formData.employeeAddress && 
+                 formData.employeeCity && formData.employeeState && 
+                 formData.employeeZip && formData.employeeSSN);
       case 2:
-        return formData.employerName && formData.employerAddress && formData.employerCity && 
-               formData.employerState && formData.employerZip;
+        return !!(formData.employerName && formData.employerAddress && 
+                 formData.employerCity && formData.employerState && 
+                 formData.employerZip && formData.employerEIN);
       case 3:
-        return formData.payPeriodStart && formData.payPeriodEnd && formData.payDate && 
-               (formData.grossPay > 0 || (formData.hourlyRate > 0 && formData.hoursWorked > 0));
+        return !!(formData.payPeriodStart && formData.payPeriodEnd && 
+                 formData.payDate && formData.payRate > 0 && formData.hoursWorked > 0);
       default:
         return true;
     }
@@ -166,6 +98,8 @@ const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack }) => 
   const nextStep = () => {
     if (validateStep(currentStep)) {
       setCurrentStep(prev => Math.min(prev + 1, 4));
+    } else {
+      alert('Please fill in all required fields before continuing.');
     }
   };
 
@@ -173,280 +107,226 @@ const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack }) => 
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const handleGenerate = () => {
-    setShowPayment(true);
-  };
-
-  const handlePayment = async () => {
+  const generatePaystub = async () => {
     setIsGenerating(true);
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setPaymentComplete(true);
-    setIsGenerating(false);
-  };
-
-  const downloadDocument = () => {
-    // In a real implementation, this would generate and download a PDF
-    const element = document.createElement('a');
-    const file = new Blob([generatePaystubHTML()], { type: 'text/html' });
-    element.href = URL.createObjectURL(file);
-    element.download = `paystub-${formData.employeeName.replace(/\s+/g, '-')}-${formData.payDate}.html`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
-
-  const generatePaystubHTML = () => {
-    const netPay = calculateNetPay();
     
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Paystub - ${formData.employeeName}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .paystub { max-width: 800px; margin: 0 auto; border: 2px solid #000; }
-        .header { background: #f0f0f0; padding: 15px; text-align: center; border-bottom: 1px solid #000; }
-        .section { padding: 15px; border-bottom: 1px solid #ccc; }
-        .row { display: flex; justify-content: space-between; margin: 5px 0; }
-        .col { flex: 1; }
-        .amount { text-align: right; font-weight: bold; }
-        .total { background: #f9f9f9; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="paystub">
-        <div class="header">
-            <h1>PAYROLL STATEMENT</h1>
-            <h2>${formData.employerName}</h2>
-        </div>
+    try {
+      // Use the DocumentGenerator class from the global scope
+      if (typeof window !== 'undefined' && (window as any).DocumentGenerator) {
+        const generator = new (window as any).DocumentGenerator();
+        const result = await generator.generateDocument('paystub', formData);
         
-        <div class="section">
-            <div class="row">
-                <div class="col">
-                    <strong>Employee:</strong><br>
-                    ${formData.employeeName}<br>
-                    ${formData.employeeAddress}<br>
-                    ${formData.employeeCity}, ${formData.employeeState} ${formData.employeeZip}
-                </div>
-                <div class="col">
-                    <strong>Employer:</strong><br>
-                    ${formData.employerName}<br>
-                    ${formData.employerAddress}<br>
-                    ${formData.employerCity}, ${formData.employerState} ${formData.employerZip}
-                </div>
-            </div>
-        </div>
+        if (result.success) {
+          setGeneratedDocument(result.document.content);
+          
+          // Save to user's document history
+          const savedDocuments = localStorage.getItem('buelldocs_documents');
+          const documents = savedDocuments ? JSON.parse(savedDocuments) : [];
+          
+          const newDocument = {
+            id: Date.now().toString(),
+            type: 'paystub',
+            name: `Paystub - ${formData.employeeName}`,
+            createdAt: new Date().toISOString(),
+            status: 'completed'
+          };
+          
+          documents.unshift(newDocument);
+          localStorage.setItem('buelldocs_documents', JSON.stringify(documents));
+          
+          setCurrentStep(4);
+        } else {
+          alert('Failed to generate paystub: ' + result.error);
+        }
+      } else {
+        // Fallback: Generate a simple paystub HTML
+        const grossPay = formData.payRate * formData.hoursWorked;
+        const federalTax = grossPay * 0.12;
+        const stateTax = grossPay * 0.05;
+        const socialSecurity = grossPay * 0.062;
+        const medicare = grossPay * 0.0145;
+        const totalDeductions = federalTax + stateTax + socialSecurity + medicare;
+        const netPay = grossPay - totalDeductions;
         
-        <div class="section">
-            <div class="row">
-                <div class="col"><strong>Pay Period:</strong> ${formData.payPeriodStart} - ${formData.payPeriodEnd}</div>
-                <div class="col"><strong>Pay Date:</strong> ${formData.payDate}</div>
+        const paystubHTML = `
+          <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ccc;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #333; margin-bottom: 5px;">${formData.employerName}</h1>
+              <p style="margin: 0; color: #666;">${formData.employerAddress}</p>
+              <p style="margin: 0; color: #666;">${formData.employerCity}, ${formData.employerState} ${formData.employerZip}</p>
+              <p style="margin: 0; color: #666;">EIN: ${formData.employerEIN}</p>
             </div>
-        </div>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+              <div>
+                <h3 style="color: #333; margin-bottom: 10px;">Employee Information</h3>
+                <p style="margin: 2px 0;"><strong>Name:</strong> ${formData.employeeName}</p>
+                <p style="margin: 2px 0;"><strong>Address:</strong> ${formData.employeeAddress}</p>
+                <p style="margin: 2px 0;"><strong>City, State ZIP:</strong> ${formData.employeeCity}, ${formData.employeeState} ${formData.employeeZip}</p>
+                <p style="margin: 2px 0;"><strong>SSN:</strong> ***-**-${formData.employeeSSN.slice(-4)}</p>
+              </div>
+              <div>
+                <h3 style="color: #333; margin-bottom: 10px;">Pay Period</h3>
+                <p style="margin: 2px 0;"><strong>Start:</strong> ${new Date(formData.payPeriodStart).toLocaleDateString()}</p>
+                <p style="margin: 2px 0;"><strong>End:</strong> ${new Date(formData.payPeriodEnd).toLocaleDateString()}</p>
+                <p style="margin: 2px 0;"><strong>Pay Date:</strong> ${new Date(formData.payDate).toLocaleDateString()}</p>
+              </div>
+            </div>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f5f5f5;">
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Description</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Rate</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Hours</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 10px;">Regular Pay</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${formData.payRate.toFixed(2)}</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${formData.hoursWorked}</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${grossPay.toFixed(2)}</td>
+                </tr>
+                <tr style="background-color: #f9f9f9; font-weight: bold;">
+                  <td style="border: 1px solid #ddd; padding: 10px;" colspan="3">Gross Pay</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${grossPay.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f5f5f5;">
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Deductions</th>
+                  <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 10px;">Federal Tax</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${federalTax.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 10px;">State Tax</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${stateTax.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 10px;">Social Security</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${socialSecurity.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 10px;">Medicare</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${medicare.toFixed(2)}</td>
+                </tr>
+                <tr style="background-color: #f9f9f9; font-weight: bold;">
+                  <td style="border: 1px solid #ddd; padding: 10px;">Total Deductions</td>
+                  <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${totalDeductions.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <div style="text-align: right; font-size: 18px; font-weight: bold; color: #333; border-top: 2px solid #333; padding-top: 10px;">
+              Net Pay: $${netPay.toFixed(2)}
+            </div>
+            
+            <div style="margin-top: 30px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+              <p style="margin: 0; font-size: 12px; color: #856404;">
+                <strong>NOTICE:</strong> This document is for novelty and educational purposes only. 
+                Not intended for fraudulent use or misrepresentation.
+              </p>
+            </div>
+          </div>
+        `;
         
-        <div class="section">
-            <h3>Earnings</h3>
-            ${formData.hourlyRate > 0 ? `
-            <div class="row">
-                <div class="col">Regular Hours (${formData.hoursWorked} hrs @ $${formData.hourlyRate}/hr)</div>
-                <div class="amount">$${formData.grossPay.toFixed(2)}</div>
-            </div>
-            ` : `
-            <div class="row">
-                <div class="col">Gross Pay</div>
-                <div class="amount">$${formData.grossPay.toFixed(2)}</div>
-            </div>
-            `}
-            <div class="row total">
-                <div class="col"><strong>Total Earnings</strong></div>
-                <div class="amount"><strong>$${formData.grossPay.toFixed(2)}</strong></div>
-            </div>
-        </div>
+        setGeneratedDocument(paystubHTML);
         
-        <div class="section">
-            <h3>Deductions</h3>
-            <div class="row">
-                <div class="col">Federal Tax</div>
-                <div class="amount">$${formData.federalTax.toFixed(2)}</div>
-            </div>
-            <div class="row">
-                <div class="col">State Tax</div>
-                <div class="amount">$${formData.stateTax.toFixed(2)}</div>
-            </div>
-            <div class="row">
-                <div class="col">Social Security</div>
-                <div class="amount">$${formData.socialSecurity.toFixed(2)}</div>
-            </div>
-            <div class="row">
-                <div class="col">Medicare</div>
-                <div class="amount">$${formData.medicare.toFixed(2)}</div>
-            </div>
-            ${formData.stateDisability > 0 ? `
-            <div class="row">
-                <div class="col">State Disability</div>
-                <div class="amount">$${formData.stateDisability.toFixed(2)}</div>
-            </div>
-            ` : ''}
-            ${formData.healthInsurance > 0 ? `
-            <div class="row">
-                <div class="col">Health Insurance</div>
-                <div class="amount">$${formData.healthInsurance.toFixed(2)}</div>
-            </div>
-            ` : ''}
-            ${formData.retirement401k > 0 ? `
-            <div class="row">
-                <div class="col">401(k) Contribution</div>
-                <div class="amount">$${formData.retirement401k.toFixed(2)}</div>
-            </div>
-            ` : ''}
-            <div class="row total">
-                <div class="col"><strong>Total Deductions</strong></div>
-                <div class="amount"><strong>$${(formData.federalTax + formData.stateTax + formData.socialSecurity + formData.medicare + formData.stateDisability + formData.healthInsurance + formData.retirement401k).toFixed(2)}</strong></div>
-            </div>
-        </div>
+        // Save to user's document history
+        const savedDocuments = localStorage.getItem('buelldocs_documents');
+        const documents = savedDocuments ? JSON.parse(savedDocuments) : [];
         
-        <div class="section total">
-            <div class="row">
-                <div class="col"><h2>NET PAY</h2></div>
-                <div class="amount"><h2>$${netPay.toFixed(2)}</h2></div>
-            </div>
-        </div>
+        const newDocument = {
+          id: Date.now().toString(),
+          type: 'paystub',
+          name: `Paystub - ${formData.employeeName}`,
+          createdAt: new Date().toISOString(),
+          status: 'completed'
+        };
         
-        <div class="section">
-            <p style="text-align: center; font-size: 12px; color: #666;">
-                This document is for novelty purposes only. Generated by BuellDocs.
-            </p>
-        </div>
-    </div>
-</body>
-</html>
-    `;
+        documents.unshift(newDocument);
+        localStorage.setItem('buelldocs_documents', JSON.stringify(documents));
+        
+        setCurrentStep(4);
+      }
+    } catch (error) {
+      console.error('Error generating paystub:', error);
+      alert('An error occurred while generating the paystub. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  if (paymentComplete) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Document Generated!</h2>
-          <p className="text-gray-600 mb-6">Your paystub has been successfully created and is ready for download.</p>
-          
-          <div className="space-y-4">
-            <button
-              onClick={downloadDocument}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-            >
-              <Download className="h-5 w-5" />
-              <span>Download Paystub</span>
-            </button>
-            
-            <button
-              onClick={onBack}
-              className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const downloadPaystub = () => {
+    if (!generatedDocument) return;
+    
+    const blob = new Blob([generatedDocument], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `paystub-${formData.employeeName.replace(/\s+/g, '-').toLowerCase()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
-  if (showPayment) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-6">
-            <CreditCard className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Complete Your Purchase</h2>
-            <p className="text-gray-600">Generate your professional paystub</p>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Paystub Generation</span>
-              <span className="font-bold text-lg">$9.99</span>
-            </div>
-          </div>
-
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
-              <input
-                type="text"
-                placeholder="1234 5678 9012 3456"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Expiry</label>
-                <input
-                  type="text"
-                  placeholder="MM/YY"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CVC</label>
-                <input
-                  type="text"
-                  placeholder="123"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={handlePayment}
-              disabled={isGenerating}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? 'Processing...' : 'Complete Purchase'}
-            </button>
-            
-            <button
-              onClick={() => setShowPayment(false)}
-              className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Back to Review
-            </button>
-          </div>
-
-          <p className="text-xs text-gray-500 text-center mt-4">
-            Secure payment processing. Your information is protected.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const printPaystub = () => {
+    if (!generatedDocument) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(generatedDocument);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <button
                 onClick={onBack}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
               >
-                <ArrowLeft className="h-6 w-6" />
+                <ArrowLeft className="h-5 w-5" />
+                <span>Back to Dashboard</span>
               </button>
-              <h1 className="text-xl font-semibold text-gray-900">Paystub Generator</h1>
+              <div className="h-6 w-px bg-gray-300"></div>
+              <div className="flex items-center space-x-3">
+                <FileText className="h-6 w-6 text-blue-600" />
+                <span className="text-lg font-semibold text-gray-900">Paystub Generator</span>
+              </div>
             </div>
             
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                {user.avatar}
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                  {user.avatar}
+                </div>
+                <span className="hidden md:inline text-sm font-medium text-gray-900">{user.name}</span>
               </div>
-              <span className="text-sm text-gray-600">{user.name}</span>
+              <button
+                onClick={onLogout}
+                className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden md:inline">Sign Out</span>
+              </button>
             </div>
           </div>
         </div>
@@ -455,109 +335,94 @@ const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack }) => 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            {[1, 2, 3, 4].map((step) => (
-              <div
-                key={step}
-                className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
-                  step <= currentStep
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}
-              >
-                {step}
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">Generate Paystub</h1>
+            <div className="text-sm text-gray-600">Step {currentStep} of 4</div>
           </div>
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Employee Info</span>
-            <span>Employer Info</span>
-            <span>Pay Details</span>
-            <span>Review</span>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(currentStep / 4) * 100}%` }}
+            ></div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           {/* Step 1: Employee Information */}
           {currentStep === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Employee Information</h2>
-                <p className="text-gray-600">Enter the employee's personal details</p>
-              </div>
-
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Employee Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name *
+                  </label>
                   <input
                     type="text"
                     value={formData.employeeName}
-                    onChange={(e) => updateFormData('employeeName', e.target.value)}
+                    onChange={(e) => handleInputChange('employeeName', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="John Doe"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">SSN (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Social Security Number *
+                  </label>
                   <input
                     type="text"
                     value={formData.employeeSSN}
-                    onChange={(e) => updateFormData('employeeSSN', e.target.value)}
+                    onChange={(e) => handleInputChange('employeeSSN', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="XXX-XX-1234"
+                    placeholder="123-45-6789"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
-                <input
-                  type="text"
-                  value={formData.employeeAddress}
-                  onChange={(e) => updateFormData('employeeAddress', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="123 Main Street"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Address *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.employeeAddress}
+                    onChange={(e) => handleInputChange('employeeAddress', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="123 Main Street"
+                  />
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    City *
+                  </label>
                   <input
                     type="text"
                     value={formData.employeeCity}
-                    onChange={(e) => updateFormData('employeeCity', e.target.value)}
+                    onChange={(e) => handleInputChange('employeeCity', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="New York"
+                    placeholder="Chicago"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-                  <select
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    State *
+                  </label>
+                  <input
+                    type="text"
                     value={formData.employeeState}
-                    onChange={(e) => updateFormData('employeeState', e.target.value)}
+                    onChange={(e) => handleInputChange('employeeState', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select State</option>
-                    <option value="AL">Alabama</option>
-                    <option value="CA">California</option>
-                    <option value="FL">Florida</option>
-                    <option value="NY">New York</option>
-                    <option value="TX">Texas</option>
-                    {/* Add more states as needed */}
-                  </select>
+                    placeholder="IL"
+                  />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ZIP Code *
+                  </label>
                   <input
                     type="text"
                     value={formData.employeeZip}
-                    onChange={(e) => updateFormData('employeeZip', e.target.value)}
+                    onChange={(e) => handleInputChange('employeeZip', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="10001"
+                    placeholder="60601"
                   />
                 </div>
               </div>
@@ -566,377 +431,241 @@ const PaystubGenerator: React.FC<PaystubGeneratorProps> = ({ user, onBack }) => 
 
           {/* Step 2: Employer Information */}
           {currentStep === 2 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Employer Information</h2>
-                <p className="text-gray-600">Enter the employer's company details</p>
-              </div>
-
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Employer Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Name *
+                  </label>
                   <input
                     type="text"
                     value={formData.employerName}
-                    onChange={(e) => updateFormData('employerName', e.target.value)}
+                    onChange={(e) => handleInputChange('employerName', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="ABC Corporation"
+                    placeholder="Acme Corporation"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">EIN (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Employer ID Number (EIN) *
+                  </label>
                   <input
                     type="text"
                     value={formData.employerEIN}
-                    onChange={(e) => updateFormData('employerEIN', e.target.value)}
+                    onChange={(e) => handleInputChange('employerEIN', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="12-3456789"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
-                <input
-                  type="text"
-                  value={formData.employerAddress}
-                  onChange={(e) => updateFormData('employerAddress', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="456 Business Ave"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Address *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.employerAddress}
+                    onChange={(e) => handleInputChange('employerAddress', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="456 Business Ave"
+                  />
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    City *
+                  </label>
                   <input
                     type="text"
                     value={formData.employerCity}
-                    onChange={(e) => updateFormData('employerCity', e.target.value)}
+                    onChange={(e) => handleInputChange('employerCity', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="New York"
+                    placeholder="Chicago"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-                  <select
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    State *
+                  </label>
+                  <input
+                    type="text"
                     value={formData.employerState}
-                    onChange={(e) => updateFormData('employerState', e.target.value)}
+                    onChange={(e) => handleInputChange('employerState', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select State</option>
-                    <option value="AL">Alabama</option>
-                    <option value="CA">California</option>
-                    <option value="FL">Florida</option>
-                    <option value="NY">New York</option>
-                    <option value="TX">Texas</option>
-                  </select>
+                    placeholder="IL"
+                  />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ZIP Code *
+                  </label>
                   <input
                     type="text"
                     value={formData.employerZip}
-                    onChange={(e) => updateFormData('employerZip', e.target.value)}
+                    onChange={(e) => handleInputChange('employerZip', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="10001"
+                    placeholder="60601"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3: Pay Details */}
+          {/* Step 3: Pay Information */}
           {currentStep === 3 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Pay Details</h2>
-                <p className="text-gray-600">Enter pay period and earnings information</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Pay Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pay Period Start *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pay Period Start *
+                  </label>
                   <input
                     type="date"
                     value={formData.payPeriodStart}
-                    onChange={(e) => updateFormData('payPeriodStart', e.target.value)}
+                    onChange={(e) => handleInputChange('payPeriodStart', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pay Period End *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pay Period End *
+                  </label>
                   <input
                     type="date"
                     value={formData.payPeriodEnd}
-                    onChange={(e) => updateFormData('payPeriodEnd', e.target.value)}
+                    onChange={(e) => handleInputChange('payPeriodEnd', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pay Date *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pay Date *
+                  </label>
                   <input
                     type="date"
                     value={formData.payDate}
-                    onChange={(e) => updateFormData('payDate', e.target.value)}
+                    onChange={(e) => handleInputChange('payDate', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pay Frequency</label>
-                <select
-                  value={formData.payFrequency}
-                  onChange={(e) => updateFormData('payFrequency', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Bi-weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="semimonthly">Semi-monthly</option>
-                </select>
-              </div>
-
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hourly Rate</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.hourlyRate || ''}
-                      onChange={(e) => updateFormData('hourlyRate', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="25.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hours Worked</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.hoursWorked || ''}
-                      onChange={(e) => updateFormData('hoursWorked', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="80"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Gross Pay *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.grossPay || ''}
-                      onChange={(e) => updateFormData('grossPay', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="2000.00"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hourly Rate *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.payRate}
+                    onChange={(e) => handleInputChange('payRate', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="25.00"
+                  />
                 </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Deductions (Auto-calculated)</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Federal Tax</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.federalTax}
-                      onChange={(e) => updateFormData('federalTax', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">State Tax</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.stateTax}
-                      onChange={(e) => updateFormData('stateTax', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Social Security</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.socialSecurity}
-                      onChange={(e) => updateFormData('socialSecurity', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Medicare</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.medicare}
-                      onChange={(e) => updateFormData('medicare', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Health Insurance</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.healthInsurance || ''}
-                      onChange={(e) => updateFormData('healthInsurance', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">401(k) Contribution</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.retirement401k || ''}
-                      onChange={(e) => updateFormData('retirement401k', parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="0.00"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hours Worked *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formData.hoursWorked}
+                    onChange={(e) => handleInputChange('hoursWorked', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="40"
+                  />
                 </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Net Pay:</span>
-                  <span className="text-blue-600">${calculateNetPay().toFixed(2)}</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gross Pay (Calculated)
+                  </label>
+                  <input
+                    type="text"
+                    value={`$${(formData.payRate * formData.hoursWorked).toFixed(2)}`}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 4: Review */}
+          {/* Step 4: Preview and Generate */}
           {currentStep === 4 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Your Paystub</h2>
-                <p className="text-gray-600">Please review all information before generating your document</p>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">Employee Information</h3>
-                    <div className="space-y-1 text-sm">
-                      <p><strong>Name:</strong> {formData.employeeName}</p>
-                      <p><strong>Address:</strong> {formData.employeeAddress}</p>
-                      <p><strong>City, State ZIP:</strong> {formData.employeeCity}, {formData.employeeState} {formData.employeeZip}</p>
-                      {formData.employeeSSN && <p><strong>SSN:</strong> {formData.employeeSSN}</p>}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Preview & Generate</h2>
+              
+              {!generatedDocument ? (
+                <div className="text-center py-8">
+                  <div className="bg-blue-50 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-medium text-blue-900 mb-2">Ready to Generate</h3>
+                    <p className="text-blue-700 mb-4">
+                      Review your information and click generate to create your paystub.
+                    </p>
+                    <div className="text-sm text-blue-600 space-y-1">
+                      <p><strong>Employee:</strong> {formData.employeeName}</p>
+                      <p><strong>Employer:</strong> {formData.employerName}</p>
+                      <p><strong>Pay Period:</strong> {formData.payPeriodStart} to {formData.payPeriodEnd}</p>
+                      <p><strong>Gross Pay:</strong> ${(formData.payRate * formData.hoursWorked).toFixed(2)}</p>
                     </div>
                   </div>
                   
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">Employer Information</h3>
-                    <div className="space-y-1 text-sm">
-                      <p><strong>Company:</strong> {formData.employerName}</p>
-                      <p><strong>Address:</strong> {formData.employerAddress}</p>
-                      <p><strong>City, State ZIP:</strong> {formData.employerCity}, {formData.employerState} {formData.employerZip}</p>
-                      {formData.employerEIN && <p><strong>EIN:</strong> {formData.employerEIN}</p>}
+                  <button
+                    onClick={generatePaystub}
+                    disabled={isGenerating}
+                    className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 mx-auto"
+                  >
+                    <FileText className="h-5 w-5" />
+                    <span>{isGenerating ? 'Generating...' : 'Generate Paystub'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Generated Paystub</h3>
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={printPaystub}
+                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>Print</span>
+                      </button>
+                      <button
+                        onClick={downloadPaystub}
+                        className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>Download</span>
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="border-t border-gray-200 mt-6 pt-6">
-                  <h3 className="font-semibold text-gray-900 mb-3">Pay Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <p><strong>Pay Period:</strong> {formData.payPeriodStart} to {formData.payPeriodEnd}</p>
-                    <p><strong>Pay Date:</strong> {formData.payDate}</p>
-                    <p><strong>Frequency:</strong> {formData.payFrequency}</p>
+                  
+                  <div className="border border-gray-300 rounded-lg p-4 bg-white max-h-96 overflow-y-auto">
+                    <div dangerouslySetInnerHTML={{ __html: generatedDocument }} />
                   </div>
                 </div>
-
-                <div className="border-t border-gray-200 mt-6 pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Earnings</h4>
-                      <div className="space-y-1 text-sm">
-                        {formData.hourlyRate > 0 && (
-                          <p>Regular Hours: {formData.hoursWorked} hrs @ ${formData.hourlyRate}/hr</p>
-                        )}
-                        <p className="font-semibold">Gross Pay: ${formData.grossPay.toFixed(2)}</p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Deductions</h4>
-                      <div className="space-y-1 text-sm">
-                        <p>Federal Tax: ${formData.federalTax.toFixed(2)}</p>
-                        <p>State Tax: ${formData.stateTax.toFixed(2)}</p>
-                        <p>Social Security: ${formData.socialSecurity.toFixed(2)}</p>
-                        <p>Medicare: ${formData.medicare.toFixed(2)}</p>
-                        {formData.healthInsurance > 0 && <p>Health Insurance: ${formData.healthInsurance.toFixed(2)}</p>}
-                        {formData.retirement401k > 0 && <p>401(k): ${formData.retirement401k.toFixed(2)}</p>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-200 mt-6 pt-6">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Net Pay:</span>
-                    <span className="text-green-600">${calculateNetPay().toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
-                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-semibold text-yellow-800">Important Notice</p>
-                  <p className="text-yellow-700">This document is for novelty purposes only and should not be used for fraudulent activities.</p>
-                </div>
-              </div>
+              )}
             </div>
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between pt-8 border-t border-gray-200">
+          <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
             <button
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              <ArrowLeft className="h-4 w-4" />
+              <span>Previous</span>
             </button>
             
-            {currentStep < 4 ? (
+            {currentStep < 4 && (
               <button
                 onClick={nextStep}
-                disabled={!validateStep(currentStep)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleGenerate}
-                className="px-8 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-              >
-                <CreditCard className="h-4 w-4" />
-                <span>Generate Paystub - $9.99</span>
+                <span>Next</span>
+                <ArrowLeft className="h-4 w-4 rotate-180" />
               </button>
             )}
           </div>
